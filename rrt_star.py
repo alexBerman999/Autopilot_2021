@@ -122,12 +122,29 @@ class RRTStar:
                 if self.collision_detection_eq(node[0], node[1], x_new, y_new):
                     self.steer(node[0], node[1], x_new, y_new)
                     near_nodes = self.find_near_nodes(cost_list)
+                    self.update_parent(x_new,y_new, near_nodes)
                     self.rewire(x_new, y_new, near_nodes)
                     if self.calc_cost(self,x_new, y_new, self.x, self.z) < self.r: 
                         self.rrt_graph.add_edge_xy(x_new, y_new, self.x, self.z)                    
                         break 
         final_tree = self.reconstruct_path()
         return final_tree,self.rrt_graph.path_costs[(self.x, self.z)]
+    
+    def update_parent(self,x, y,near_nodes):
+        costs = []
+        for elem in near_nodes: 
+            edge_cost = self.calc_cost(self,elem[0], elem[1], x,y)
+            cost = self.rrt_graph.path_costs[elem] + edge_cost 
+            if self.collision_detection_eq(elem[0], elem[1], x,y): 
+                costs.append(cost)
+            else: 
+                costs.append(float("inf"))
+        if costs:
+            min_cost = min(costs)
+            if min_cost != float("inf"):
+                min_ind = costs.index(min_cost)
+                self.rrt_graph.add_edge_xy(near_nodes[min_ind][0], near_nodes[min_ind][1], x,y)
+                self.rrt_graph.parents[(x,y)] = near_nodes[min_ind]
     
     def find_near_nodes(self, costs): 
         nearest_vertices = []
@@ -220,29 +237,3 @@ class RRTStar:
         return final_list
 
 
-'''def main():
-    obstacle_list.append([4,4,5,4])
-    obstacle_list.append([2,2,8,10])
-    rrt = RRTStar(0, 20, 0, 10, 3000, 2, obstacle_list)
-    result, cost = rrt.planning()
-    print(cost)
-    xarray = []
-    yarray = []
-    x1arr = []
-    y1arr = []
-    for elem in result: 
-        xarray.append(elem[0])
-        yarray.append(elem[1])
-    for elem in rrt.rrt_graph.vertices: 
-        x1arr.append(elem[0])
-        y1arr.append(elem[1])
-    circle1=plt.Circle((5,4),4,color='r')
-    circle2 = plt.Circle((8,10),2.5,color = 'r')
-    plt.gcf().gca().add_artist(circle1) 
-    plt.gcf().gca().add_artist(circle2)
-    plt.plot(xarray, yarray)
-    #plt.plot(x1arr, y1arr)
-    plt.show()
-    #result2 = rrt.collision_detection_eq(0,0,8.447922063023716, 18.46243851008471)
-if __name__ == "__main__":
-    main()'''

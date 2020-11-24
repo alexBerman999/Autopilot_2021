@@ -115,23 +115,26 @@ class RRTStar:
     def planning(self):
         self.rrt_graph.add_init(self.w, self.y)
         for i in range(self.n):
-            nearest_vertices = []
             x_new = random.uniform(0,40)
             y_new = random.uniform(0,40)
             if not self.collision_detection( x_new, y_new):
                 node, cost_list = self.nearest(x_new, y_new)
                 if self.collision_detection_eq(node[0], node[1], x_new, y_new):
                     self.steer(node[0], node[1], x_new, y_new)
-                    for i in range(len(cost_list)):
-                        if cost_list[i] < (self.r*5):
-                            nearest_vertices.append(self.rrt_graph.vertices[i])
-                    self.rewire(x_new, y_new, nearest_vertices)
+                    near_nodes = self.find_near_nodes(cost_list)
+                    self.rewire(x_new, y_new, near_nodes)
                     if self.calc_cost(self,x_new, y_new, self.x, self.z) < self.r: 
                         self.rrt_graph.add_edge_xy(x_new, y_new, self.x, self.z)                    
                         break 
         final_tree = self.reconstruct_path()
         return final_tree,self.rrt_graph.path_costs[(self.x, self.z)]
     
+    def find_near_nodes(self, costs): 
+        nearest_vertices = []
+        for i in range(len(cost_list)):
+            if cost_list[i] < (self.r*5):
+                nearest_vertices.append(self.rrt_graph.vertices[i])
+        return nearest_vertices
     def nearest(self, x, y):
         point_costs = defaultdict(float)
         length = len(self.rrt_graph.vertices)

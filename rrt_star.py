@@ -117,16 +117,18 @@ class RRTStar:
         for i in range(self.n):
             x_new = random.uniform(0,40)
             y_new = random.uniform(0,40)
-            if not self.collision_detection( x_new, y_new):
+            if self.collision_detection( x_new, y_new):
                 node, cost_list = self.nearest(x_new, y_new)
                 if self.collision_detection_eq(node[0], node[1], x_new, y_new):
                     self.steer(node[0], node[1], x_new, y_new)
                     near_nodes = self.find_near_nodes(cost_list)
-                    self.update_parent(x_new,y_new, near_nodes)
+                    self.update_parent(x_new,y_new,near_nodes)
                     self.rewire(x_new, y_new, near_nodes)
-                    if self.calc_cost(self,x_new, y_new, self.x, self.z) < self.r: 
-                        self.rrt_graph.add_edge_xy(x_new, y_new, self.x, self.z)                    
+                    if self.calc_cost(self,x_new, y_new, self.x, self.z) < self.r and i > 200: 
+                        self.search_best_goal_node()                  
                         break 
+        if (self.x, self.z) not in list(self.rrt_graph.parents.keys()):
+            self.search_best_goal_node()
         final_tree = self.reconstruct_path()
         return final_tree,self.rrt_graph.path_costs[(self.x, self.z)]
     
@@ -135,23 +137,32 @@ class RRTStar:
         for elem in near_nodes: 
             edge_cost = self.calc_cost(self,elem[0], elem[1], x,y)
             cost = self.rrt_graph.path_costs[elem] + edge_cost 
-            if self.collision_detection_eq(elem[0], elem[1], x,y): 
+            if self.collision_detection_eq(elem[0], elem[1], x,y) and (elem[0], elem[1]) != (x,y): 
                 costs.append(cost)
             else: 
-                costs.append(float("inf"))
+                costs.append(100000)
         if costs:
             min_cost = min(costs)
-            if min_cost != float("inf"):
+            if min_cost != 100000:
                 min_ind = costs.index(min_cost)
-                self.rrt_graph.add_edge_xy(near_nodes[min_ind][0], near_nodes[min_ind][1], x,y)
-                self.rrt_graph.parents[(x,y)] = near_nodes[min_ind]
+                self.steer(near_nodes[min_ind][0], near_nodes[min_ind][1], x,y)
     
-    def find_near_nodes(self, costs): 
+    def search_best_goal_node(self): 
+        goal_near_nodes = []
+        for elem in self.rrt_graph.vertices: 
+            if (self.calc_cost(self, elem[0], elem[1], self.x, self.z) < (self.r*3)):
+                if self.collision_detection_eq(elem[0], elem[1], self.x, self.z): 
+                    goal_near_nodes.append(elem)
+        self.update_parent(self.x,self.z, goal_near_nodes)
+
+
+    def find_near_nodes(self,cost_list): 
         nearest_vertices = []
         for i in range(len(cost_list)):
-            if cost_list[i] < (self.r*5):
+            if cost_list[i] < (self.r*2):
                 nearest_vertices.append(self.rrt_graph.vertices[i])
         return nearest_vertices
+    
     def nearest(self, x, y):
         point_costs = defaultdict(float)
         length = len(self.rrt_graph.vertices)
@@ -194,7 +205,7 @@ class RRTStar:
             initial_cost = self.rrt_graph.path_costs[elem]
             upto_cost = self.rrt_graph.path_costs[(x,y)]
             cost = self.calc_cost(self,x, y, elem[0], elem[1]) + upto_cost
-            if cost<initial_cost and self.collision_detection_eq(x, y, elem[0], elem[1]):
+            if (cost<initial_cost) and self.collision_detection_eq(x, y, elem[0], elem[1]):
                 self.steer(x,y, elem[0], elem[1])
                 self.rrt_graph.update_cost_xy(elem[0], elem[1])
     
@@ -202,24 +213,28 @@ class RRTStar:
         for elem in self.obstacle_list:
             value = (x - elem[2])**2 + (y-elem[3])**2
             if value <= (elem[1] ** 2): 
-                return True
-            else:
                 return False
+            else:
+                return True
 
     def collision_detection_eq(self,x1, y1, x2, y2):
         step_size = 0.1
-        distance = math.hypot((x2 - x1), (y2 - y1))
         theta = math.atan2((y2-y1), (x2-x1))
-        n = distance/step_size
-        for obstacle in self.obstacle_list:
-            i = 0
-            while i < n:
-                x = x1 + (step_size * math.cos(theta)*i)
-                y = y1 + (step_size * math.sin(theta)*i)
-                value = math.pow((x-obstacle[2]),2) + math.pow((y-obstacle[3]),2)
-                if value <= math.pow(obstacle[1],2): 
-                    return False
-                i +=1 
+        #print(theta)
+        boolean = True
+        for element in self.obstacle_list:
+            #print(element)
+            x=x1
+            y=y1
+            while (x < x2):
+                x += (step_size * math.cos(theta))
+                y += (step_size * math.sin(theta))
+                value = ((x-element[2])**2 + (y-element[3])** 2)
+                #print(x,y,value)
+                #print(element[0], element[2], element[3])
+                if value <= (element[0]**2): 
+                    boolean = False
+                    return False 
         return True
 
     def reconstruct_path(self):
@@ -230,10 +245,9 @@ class RRTStar:
         result_queue.appendleft(self.rrt_graph.parents[key])
         while result_queue and self.rrt_graph.parents[key] is not None:
             key = result_queue.pop()
-            print(key)
             final_list.appendleft(key)
             result_queue.appendleft(self.rrt_graph.parents[key])
-
+        print(final_list)
         return final_list
 
 
